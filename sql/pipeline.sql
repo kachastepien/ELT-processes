@@ -4,11 +4,15 @@
 
 
 -- 0. database setup
-CREATE DATABASE IF NOT EXISTS ux_analytics;
+-- In DuckDB the database is the .duckdb file you open; this schema groups our
+-- tables. On SparkSQL/Trino swap the two lines below for CREATE DATABASE / USE.
+CREATE SCHEMA IF NOT EXISTS ux_analytics;
 USE ux_analytics;
 
 
 -- 1. raw tables (bronze)
+-- Explicit schema so the column types are documented, then load the raw JSON.
+-- read_json_auto is DuckDB; on Spark this would be: INSERT INTO ... SELECT * FROM json.`...`
 
 DROP TABLE IF EXISTS raw_sessions;
 CREATE TABLE raw_sessions (
@@ -23,8 +27,10 @@ CREATE TABLE raw_sessions (
     country      VARCHAR
 );
 
--- Load from JSON (SparkSQL syntax):
--- INSERT INTO raw_sessions SELECT * FROM json.`data/raw/sessions.json`;
+INSERT INTO raw_sessions
+SELECT session_id, user_id, page, device, duration_sec,
+       clicked_cta, converted, ts, country
+FROM read_json_auto('data/raw/sessions.json');
 
 DROP TABLE IF EXISTS raw_pages;
 CREATE TABLE raw_pages (
@@ -33,6 +39,10 @@ CREATE TABLE raw_pages (
     funnel_step INTEGER,
     step_name   VARCHAR
 );
+
+INSERT INTO raw_pages
+SELECT page_id, page, funnel_step, step_name
+FROM read_json_auto('data/raw/pages.json');
 
 
 -- 2. clean tables (silver)

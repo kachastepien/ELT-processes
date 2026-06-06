@@ -3,8 +3,6 @@
 Reproducible SQL ELT for product conversion-funnel analytics, built on a
 Bronze -> Silver -> Gold (medallion) model. Runs on DuckDB.
 
-Repo: https://github.com/kachastepien/ELT-processes
-
 ## 1. Problem Statement
 
 Product teams track thousands of sessions a day but have no single view of how
