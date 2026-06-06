@@ -1,10 +1,6 @@
 # UX Analytics ETL Pipeline
 
-**Stack:** PySpark · Apache Airflow · dbt (bonus)  
-**Course:** Scalable Processing + Orchestration  
-**Repo:** https://github.com/kachastepien/ELT-processes
-
----
+Stack: PySpark, Apache Airflow, dbt (bonus). Repo: https://github.com/kachastepien/ELT-processes
 
 ## 1. Problem Statement
 
@@ -185,6 +181,4 @@ ux-analytics-etl/
             └── mart_device_metrics.sql   # Gold: device CTR/CVR
 ```
 
----
-
-*Course project: Scalable Processing (PySpark) + Orchestration (Apache Airflow)*
+Course project - ELT processes.

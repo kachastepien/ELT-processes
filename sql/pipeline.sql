@@ -1,20 +1,14 @@
--- ============================================================
--- UX Analytics – Reproducible SQL Script
--- Compatible with: DuckDB / SparkSQL / Trino
--- Run top to bottom; each section is idempotent (DROP IF EXISTS)
--- ============================================================
+-- UX Analytics - reproducible SQL script
+-- Tested on DuckDB (works on SparkSQL/Trino too).
+-- Run top to bottom, safe to re-run (DROP IF EXISTS everywhere).
 
 
--- ─────────────────────────────────────
--- 0. DATABASE SETUP
--- ─────────────────────────────────────
+-- 0. database setup
 CREATE DATABASE IF NOT EXISTS ux_analytics;
 USE ux_analytics;
 
 
--- ─────────────────────────────────────
--- 1. RAW TABLES  (Bronze layer)
--- ─────────────────────────────────────
+-- 1. raw tables (bronze)
 
 DROP TABLE IF EXISTS raw_sessions;
 CREATE TABLE raw_sessions (
@@ -41,15 +35,14 @@ CREATE TABLE raw_pages (
 );
 
 
--- ─────────────────────────────────────
--- 2. CLEAN TABLES  (Silver layer)
--- ─────────────────────────────────────
--- DQ-1: drop null PKs
--- DQ-2: normalize device to lowercase
--- DQ-3: nullify unrealistic duration_sec
--- DQ-4: safe timestamp cast
--- DQ-5: fill missing country
--- DQ-6: bot/suspicious flag
+-- 2. clean tables (silver)
+-- data quality rules:
+--   DQ-1 drop null PKs
+--   DQ-2 normalize device to lowercase
+--   DQ-3 nullify unrealistic duration_sec
+--   DQ-4 safe timestamp cast
+--   DQ-5 fill missing country
+--   DQ-6 bot/suspicious flag
 
 DROP TABLE IF EXISTS clean_sessions;
 CREATE TABLE clean_sessions AS
@@ -83,11 +76,9 @@ FROM raw_pages
 WHERE page_id IS NOT NULL;
 
 
--- ─────────────────────────────────────
--- 3. GOLD TABLES
--- ─────────────────────────────────────
+-- 3. gold tables
 
--- Gold 1: funnel conversion metrics  (JOIN + AGG)
+-- gold 1: funnel conversion metrics (JOIN + AGG)
 DROP TABLE IF EXISTS gold_funnel_metrics;
 CREATE TABLE gold_funnel_metrics AS
 SELECT
@@ -107,7 +98,7 @@ LEFT JOIN clean_pages p ON s.page = p.page
 GROUP BY s.page, p.funnel_step, p.step_name
 ORDER BY p.funnel_step;
 
--- Gold 2: device breakdown  (AGG)
+-- gold 2: device breakdown (AGG)
 DROP TABLE IF EXISTS gold_device_metrics;
 CREATE TABLE gold_device_metrics AS
 SELECT
@@ -127,9 +118,7 @@ GROUP BY device
 ORDER BY session_count DESC;
 
 
--- ─────────────────────────────────────
--- 4. DATA QUALITY CHECKS
--- ─────────────────────────────────────
+-- 4. data quality checks (run these to see the % of bad rows)
 
 SELECT 'null session_id rate'           AS dq_check,
        ROUND(100.0 * SUM(CASE WHEN session_id IS NULL THEN 1 ELSE 0 END)
@@ -161,9 +150,7 @@ LEFT JOIN clean_pages p ON s.page = p.page
 WHERE p.page_id IS NULL;
 
 
--- ─────────────────────────────────────
--- 5. VERIFICATION
--- ─────────────────────────────────────
+-- 5. verification - row counts per table
 
 SELECT 'raw_sessions'        AS table_name, COUNT(*) AS rows FROM raw_sessions
 UNION ALL SELECT 'raw_pages',               COUNT(*) FROM raw_pages

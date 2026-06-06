@@ -1,17 +1,7 @@
-"""
-ETL Pipeline: UX Analytics – Conversion Funnel
-===============================================
-Analytical goal:
-    Identify bottlenecks in the product conversion funnel.
-    Which pages cause the most drop-off? Which devices convert best?
-
-Architecture (Kimball-inspired medallion):
-    Bronze  – raw JSON files, no changes
-    Silver  – validated, typed, cleaned records
-    Gold    – aggregated UX metrics with JOIN
-
-Polish comments intentional: project documentation language is Polish.
-"""
+# UX Analytics ETL - conversion funnel
+#
+# Goal: find where users drop off in the funnel and which device converts best.
+# Layers: bronze (raw json) -> silver (cleaned) -> gold (aggregated metrics).
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
@@ -36,9 +26,7 @@ spark = (
 spark.sparkContext.setLogLevel("WARN")
 
 
-# ─────────────────────────────────────────────────────────────
-# BRONZE: Load raw data as-is
-# ─────────────────────────────────────────────────────────────
+# BRONZE - load raw data as-is
 def load_bronze():
     print("\n=== BRONZE: Loading raw data ===")
 
@@ -74,9 +62,7 @@ def load_bronze():
     return df_sessions, df_pages
 
 
-# ─────────────────────────────────────────────────────────────
-# SILVER: Clean & validate
-# ─────────────────────────────────────────────────────────────
+# SILVER - clean & validate
 def clean_sessions(df_raw):
     """
     Silver layer – sessions.
@@ -147,9 +133,7 @@ def clean_pages(df_raw):
     return df
 
 
-# ─────────────────────────────────────────────────────────────
-# GOLD: Aggregations + JOINs
-# ─────────────────────────────────────────────────────────────
+# GOLD - aggregations + joins
 def build_gold(df_sessions, df_pages):
     """
     Gold layer – two tables:
@@ -158,7 +142,7 @@ def build_gold(df_sessions, df_pages):
     """
     print("\n=== GOLD: Building analytics tables ===")
 
-    # ── GOLD 1: Funnel conversion metrics ─────────────────────────────────
+    # gold 1: funnel conversion metrics (join + agg)
     funnel_metrics = (
         df_sessions
         .join(
@@ -182,7 +166,7 @@ def build_gold(df_sessions, df_pages):
     print("\n  [GOLD] funnel_metrics:")
     funnel_metrics.show(truncate=False)
 
-    # ── GOLD 2: Device breakdown ───────────────────────────────────────────
+    # gold 2: device breakdown
     device_metrics = (
         df_sessions
         .groupBy("device")
@@ -207,17 +191,12 @@ def build_gold(df_sessions, df_pages):
     return funnel_metrics, device_metrics
 
 
-# ─────────────────────────────────────────────────────────────
-# Persist to Parquet
-# ─────────────────────────────────────────────────────────────
+# save to parquet
 def save(df, path, label):
     df.write.mode("overwrite").parquet(path)
     print(f"  Saved {label} -> {path}  ({df.count()} rows)")
 
 
-# ─────────────────────────────────────────────────────────────
-# MAIN
-# ─────────────────────────────────────────────────────────────
 def run():
     print("=" * 60)
     print("  UX Analytics ETL Pipeline")
@@ -237,7 +216,7 @@ def run():
     save(funnel_metrics,  os.path.join(GOLD_DIR, "funnel_metrics"),  "gold/funnel_metrics")
     save(device_metrics,  os.path.join(GOLD_DIR, "device_metrics"),  "gold/device_metrics")
 
-    print("\n✅  Pipeline complete.")
+    print("\nPipeline complete.")
     spark.stop()
 
 
