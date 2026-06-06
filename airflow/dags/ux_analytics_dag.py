@@ -1,19 +1,3 @@
-"""
-Airflow DAG: ux_analytics_etl
-==============================
-Orchestrates the full Bronze → Silver → Gold pipeline
-for UX analytics data: user sessions, CTA clicks, conversion funnel.
-
-Key Airflow concepts demonstrated:
-  • DAG with daily schedule (03:00 UTC)
-  • Task dependency tree
-  • Retries with exponential backoff
-  • BranchPythonOperator – conditional routing
-  • XCom – passing DQ results between tasks
-  • SLA alert when pipeline exceeds time limit
-  • max_active_runs=1 – prevents concurrent overlapping runs
-"""
-
 from __future__ import annotations
 
 import os
@@ -46,10 +30,7 @@ DEFAULT_ARGS = {
 
 
 def validate_source_files(**context):
-    """
-    Check that required raw data files exist before launching the Spark job.
-    Pushes a JSON summary via XCom so downstream tasks can read the result.
-    """
+
     raw_dir  = os.path.join(BASE_DIR, "data", "raw")
     required = ["sessions.json", "pages.json"]
     missing  = [f for f in required
