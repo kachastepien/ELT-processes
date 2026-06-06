@@ -1,0 +1,8 @@
+{"session_id": "s001", "user_id": "u1", "page": "/home", "device": "mobile", "duration_sec": 142, "clicked_cta": true, "converted": false, "ts": "2024-03-01 08:12:00", "country": "PL"}
+{"session_id": "s002", "user_id": "u2", "page": "/pricing", "device": "desktop", "duration_sec": 340, "clicked_cta": true, "converted": true, "ts": "2024-03-01 09:05:00", "country": "PL"}
+{"session_id": "s003", "user_id": "u3", "page": "/pricing", "device": "mobile", "duration_sec": -10, "clicked_cta": false, "converted": false, "ts": "2024-03-01 09:30:00", "country": "DE"}
+{"session_id": "s004", "user_id": "u1", "page": "/checkout", "device": "desktop", "duration_sec": 890, "clicked_cta": true, "converted": true, "ts": "2024-03-01 10:00:00", "country": "PL"}
+{"session_id": null, "user_id": null, "page": "/home", "device": "tablet", "duration_sec": 55, "clicked_cta": false, "converted": false, "ts": "2024-03-01 10:15:00", "country": null}
+{"session_id": "s005", "user_id": "u4", "page": "/features", "device": "MOBILE", "duration_sec": 9999999, "clicked_cta": false, "converted": false, "ts": "not-a-date", "country": "FR"}
+{"session_id": "s006", "user_id": "u5", "page": "/checkout", "device": "desktop", "duration_sec": 430, "clicked_cta": true, "converted": false, "ts": "2024-03-02 11:00:00", "country": "PL"}
+{"session_id": "s007", "user_id": "u6", "page": "/features", "device": "mobile", "duration_sec": 210, "clicked_cta": false, "converted": false, "ts": "2024-03-02 12:30:00", "country": "UK"}

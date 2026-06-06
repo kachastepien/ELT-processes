@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Spark / ETL generated output (Silver + Gold are reproducible from raw)
+data/clean/
+data/gold/
+*.parquet
+.crc
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+
+# Airflow runtime
+airflow/airflow.db
+airflow/airflow.cfg
+airflow/logs/
+airflow/*.pid
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,5 @@
+{"page_id": 1, "page": "/home", "funnel_step": 1, "step_name": "Awareness"}
+{"page_id": 2, "page": "/features", "funnel_step": 2, "step_name": "Interest"}
+{"page_id": 3, "page": "/pricing", "funnel_step": 3, "step_name": "Consideration"}
+{"page_id": 4, "page": "/checkout", "funnel_step": 4, "step_name": "Decision"}
+{"page_id": null, "page": "/blog", "funnel_step": null, "step_name": "Off-funnel"}
