@@ -1,25 +1,15 @@
+# Work-in-progress for assignment 2 (Spark / Airflow / dbt) - kept locally, not part of this repo
+assignment2_wip/
+
 # Python
 __pycache__/
 *.py[cod]
 .venv/
 venv/
 
-# Spark / ETL generated output (Silver + Gold are reproducible from raw)
-data/clean/
-data/gold/
-*.parquet
-.crc
-
-# dbt
-dbt/target/
-dbt/dbt_packages/
-dbt/logs/
-
-# Airflow runtime
-airflow/airflow.db
-airflow/airflow.cfg
-airflow/logs/
-airflow/*.pid
+# DuckDB local database file
+*.duckdb
+*.db
 
 # OS / IDE
 .DS_Store

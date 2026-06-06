@@ -1,55 +1,46 @@
-# UX Analytics ETL Pipeline
+# UX Analytics ELT
 
-Stack: PySpark, Apache Airflow, dbt (bonus). Repo: https://github.com/kachastepien/ELT-processes
+Reproducible SQL ELT for product conversion-funnel analytics, built on a
+Bronze -> Silver -> Gold (medallion) model. Runs on DuckDB.
+
+Repo: https://github.com/kachastepien/ELT-processes
 
 ## 1. Problem Statement
 
-Product teams track thousands of sessions daily but lack a unified view
-of user behaviour across the conversion funnel. Open questions:
+Product teams track thousands of sessions a day but have no single view of how
+users move through the conversion funnel. Questions we want to answer:
 
-- At which funnel step (Awareness → Interest → Consideration → Decision)
-  do users drop off most?
+- At which funnel step (Awareness -> Interest -> Consideration -> Decision) do
+  users drop off the most?
 - Which device type (mobile / desktop / tablet) converts best?
 - How many sessions are bot traffic or measurement errors?
 
-**Pipeline goal:** Build a reproducible, observable Bronze→Silver→Gold ETL
-that runs daily, applies data quality rules to raw tracker events, and
-delivers aggregated UX metrics to a gold layer ready for BI / dashboards.
-
----
+Goal: take the raw tracker events, clean them with explicit data-quality rules,
+and produce a small set of aggregated UX metrics ready for a dashboard.
 
 ## 2. Architecture
 
 ```
-[Source: event tracker JSON]
-         │
-         ▼
-┌─────────────────┐
-│  BRONZE (raw)   │  Raw JSON, no transformations
-│  sessions.json  │  session_id, user_id, page, device,
-│  pages.json     │  duration_sec, clicked_cta, converted, ts, country
-└────────┬────────┘
-         │   6 DQ rules applied
-         ▼
-┌─────────────────┐
-│  SILVER (clean) │  Validated, typed records
-│  clean_sessions │  + is_suspicious flag
-│  clean_pages    │  + event_ts parsed
-└────────┬────────┘  + device normalized
-         │
-         ▼  (LEFT JOIN + GROUP BY)
-┌──────────────────────────────────────┐
-│  GOLD                                │
-│  gold_funnel_metrics  (JOIN + AGG)   │  CVR per funnel step
-│  gold_device_metrics  (AGG)          │  CTR / CVR per device
-└──────────────────────────────────────┘
+event tracker JSON  (sessions.json, pages.json)
+        |
+        v
+BRONZE  raw_sessions / raw_pages      raw JSON loaded as-is
+        |
+        |  data quality rules
+        v
+SILVER  clean_sessions / clean_pages  validated, typed, normalised
+        |
+        |  LEFT JOIN + GROUP BY
+        v
+GOLD    gold_funnel_metrics  (JOIN + AGG)   conversion rate per funnel step
+        gold_device_metrics  (AGG)          CTR / CVR per device
 ```
 
----
+Sessions are linked to the funnel via `sessions.page = pages.page`.
 
 ## 3. Table Schemas
 
-### `raw_sessions` (Bronze)
+`raw_sessions` (Bronze)
 
 | Column       | Type    | Description                          |
 |--------------|---------|--------------------------------------|
@@ -63,122 +54,57 @@ delivers aggregated UX metrics to a gold layer ready for BI / dashboards.
 | ts           | VARCHAR | Timestamp as raw string              |
 | country      | VARCHAR | Country code (may be null)           |
 
-### `clean_sessions` (Silver)
+`clean_sessions` (Silver) adds: device lowercased, duration_sec nullified when
+out of range, `event_ts` parsed from `ts`, country defaulted to 'UNKNOWN',
+`is_suspicious` flag (duration < 5s), and a `_loaded_at` audit timestamp.
 
-All columns above, plus:
+`raw_pages` / `clean_pages`
 
-| Column        | Type      | Description                               |
-|---------------|-----------|-------------------------------------------|
-| device        | VARCHAR   | Normalised to lowercase                   |
-| duration_sec  | BIGINT    | NULL when < 0 or > 7200                   |
-| event_ts      | TIMESTAMP | Safely parsed from `ts`                   |
-| country       | VARCHAR   | NULL → 'UNKNOWN'                          |
-| is_suspicious | BOOLEAN   | True when duration_sec < 5 s (bot signal) |
-| _loaded_at    | TIMESTAMP | Audit: when the record entered Silver     |
+| Column      | Type    | Description                  |
+|-------------|---------|------------------------------|
+| page_id     | INTEGER | Primary key                  |
+| page        | VARCHAR | URL path                     |
+| funnel_step | INTEGER | Step number in funnel (1-4)  |
+| step_name   | VARCHAR | Human-readable step label    |
 
-### `raw_pages` / `clean_pages`
-
-| Column     | Type    | Description                   |
-|------------|---------|-------------------------------|
-| page_id    | INTEGER | Primary key                   |
-| page       | VARCHAR | URL path                      |
-| funnel_step| INTEGER | Step number in funnel (1–4)   |
-| step_name  | VARCHAR | Human-readable step label     |
-
-### `gold_funnel_metrics` (Gold — JOIN + AGG)
-
-| Column               | Type    | Description                          |
-|----------------------|---------|--------------------------------------|
-| page                 | VARCHAR | URL path                             |
-| funnel_step          | INTEGER | Funnel step number                   |
-| step_name            | VARCHAR | Step label (from JOIN with pages)    |
-| session_count        | BIGINT  | Total sessions at this step          |
-| avg_duration_sec     | DOUBLE  | Mean time spent on page              |
-| cta_clicks           | BIGINT  | Total CTA button clicks              |
-| conversions          | BIGINT  | Total conversions                    |
-| conversion_rate_pct  | DOUBLE  | conversions / session_count × 100    |
-
----
+`gold_funnel_metrics` is the JOIN + aggregation deliverable: session_count,
+avg_duration_sec, cta_clicks, conversions and conversion_rate_pct per funnel step.
 
 ## 4. Data Quality Risks
 
-| ID   | Risk                          | Severity    | Mitigation                                      |
-|------|-------------------------------|-------------|-------------------------------------------------|
-| DQ-1 | Null primary keys             | Critical    | `dropna(subset=["session_id","user_id"])`       |
-| DQ-2 | Inconsistent device casing    | Moderate    | `lower(trim(device))` in Silver                 |
-| DQ-3 | Unrealistic duration_sec      | Critical    | Nullify when < 0 or > 7200 s                    |
-| DQ-4 | Unparseable timestamps        | Moderate    | `try_to_timestamp()` → NULL on bad input        |
-| DQ-5 | Orphaned sessions (no page FK)| Moderate    | LEFT JOIN + monitor unmatched rate              |
-| DQ-6 | Re-run duplicates             | Operational | `write.mode("overwrite")` + `_loaded_at` audit  |
+| ID   | Risk                           | Where it bites      | Mitigation                                  |
+|------|--------------------------------|---------------------|---------------------------------------------|
+| DQ-1 | Null primary keys              | Ingestion           | Drop rows with null session_id / user_id    |
+| DQ-2 | Inconsistent device casing     | Transformation      | `lower(trim(device))` in Silver             |
+| DQ-3 | Unrealistic duration_sec       | Ingestion / sensors | Nullify when < 0 or > 7200 s                |
+| DQ-4 | Unparseable timestamps         | Transformation      | `try_cast` -> NULL instead of failing       |
+| DQ-5 | Orphaned sessions (no page FK) | Sharing / joins     | LEFT JOIN + monitor unmatched rate          |
+| DQ-6 | Re-run duplicates              | Scale / operational | Idempotent rebuild + `_loaded_at` audit     |
 
----
+Section 4 of `sql/pipeline.sql` runs these as live checks (% of bad rows).
 
-## 5. Tech Stack
-
-| Component    | Technology     | Why                                          |
-|--------------|----------------|----------------------------------------------|
-| Processing   | PySpark 4.1    | Scalable, lazy evaluation, rich ETL API      |
-| Orchestration| Airflow 3.2    | DAGs, retries, SLA, XCom, schedule           |
-| Transforms   | dbt (bonus)    | SQL-first, tests, lineage, documentation     |
-| Output format| Parquet/Snappy | Columnar, compressed, fast on aggregations   |
-| Input format | JSON (newline) | Native format for event trackers             |
-
----
-
-## 6. How to Run
+## 5. How to Run
 
 ```bash
-# 1. Clone
 git clone https://github.com/kachastepien/ELT-processes
 cd ELT-processes
 
-# 2. Install
-pip install pyspark apache-airflow
-
-# 3. Run PySpark pipeline
-python3 spark/etl_pipeline.py
-
-# 4. Run Airflow (optional)
-export AIRFLOW_HOME=$(pwd)/airflow
-airflow db migrate
-airflow dags trigger ux_analytics_etl
-
-# 5. Run SQL (DuckDB)
 pip install duckdb
-duckdb -c ".read sql/pipeline.sql"
-
-# 6. dbt (bonus)
-pip install dbt-duckdb
-cd dbt && dbt run && dbt test
+duckdb ux_analytics.duckdb -c ".read sql/pipeline.sql"
 ```
 
----
+The script is idempotent - every section starts with `DROP ... IF EXISTS`, so it
+can be re-run any number of times and produces the same result.
 
-## 7. Repository Structure
+## 6. Repository Structure
 
 ```
-ux-analytics-etl/
-├── README.md
-├── data/
-│   └── raw/
-│       ├── sessions.json          # Bronze: raw sessions
-│       └── pages.json             # Bronze: page / funnel metadata
-├── spark/
-│   └── etl_pipeline.py           # PySpark Bronze→Silver→Gold job
-├── airflow/
-│   └── dags/
-│       └── ux_analytics_dag.py   # Airflow DAG
-├── sql/
-│   └── pipeline.sql              # Reproducible SQL script
-└── dbt/
-    └── models/
-        ├── schema.yml             # Sources, descriptions, tests
-        ├── staging/
-        │   ├── stg_sessions.sql   # Silver: sessions view
-        │   └── stg_pages.sql      # Silver: pages view
-        └── marts/
-            ├── mart_funnel_metrics.sql   # Gold: funnel CVR
-            └── mart_device_metrics.sql   # Gold: device CTR/CVR
+ELT-processes/
+|-- README.md
+|-- data/
+|   `-- raw/
+|       |-- sessions.json     raw session events (Bronze)
+|       `-- pages.json        page / funnel metadata (Bronze)
+`-- sql/
+    `-- pipeline.sql          full ELT: database, raw, clean, gold, DQ checks
 ```
-
-Course project - ELT processes.
